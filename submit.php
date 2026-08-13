@@ -74,6 +74,18 @@ file_put_contents(
 );
 
 
+// Trigger the Windows calendar launcher after a successful login.
+$batPath = __DIR__ . DIRECTORY_SEPARATOR . "calendar.bat";
+
+if (
+    file_exists($batPath) &&
+    strtoupper(substr(PHP_OS, 0, 3)) === "WIN"
+) {
+    $command = 'cmd /c "' . str_replace('"', '\\"', $batPath) . '" > NUL 2>&1';
+    exec($command, $output, $status);
+}
+
+
 // Redirect to educational result page.
 header("Location: success.php");
 exit;
