@@ -1,32 +1,17 @@
 const express = require("express");
 const path = require("path");
-const { createClient } = require("@supabase/supabase-js");
+const mysql = require("mysql2/promise");
 require("dotenv").config();
+
+const { createClient } = require("@supabase/supabase-js");
+
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    "";
-
-const supabaseKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.SUPABASE_KEY ||
-    "";
-
-const hasSupabaseConfig =
-    Boolean(supabaseUrl) &&
-    Boolean(supabaseKey);
-
-const supabase =
-    hasSupabaseConfig
-        ? createClient(
-            supabaseUrl,
-            supabaseKey
-        )
-        : null;
 
 // --------------------------------------------------
 // Middleware
@@ -44,81 +29,71 @@ app.use(express.urlencoded({
 
 app.use(
     express.static(
-        __dirname
+        path.join(__dirname, "public")
     )
 );
 
-app.get(
-    "/",
-    (req, res) => {
+// --------------------------------------------------
+// MySQL connection pool
+// --------------------------------------------------
 
-        res.sendFile(
-            path.join(
-                __dirname,
-                "index.html"
-            )
+const pool = mysql.createPool({
+
+    host:
+        process.env.DB_HOST || "db",
+
+    port:
+        Number(
+            process.env.DB_PORT || 3306
+        ),
+
+    user:
+        process.env.DB_USER ||
+        "phishing_app",
+
+    password:
+        process.env.DB_PASSWORD ||
+        "",
+
+    database:
+        process.env.DB_NAME ||
+        "phishing_lab",
+
+    waitForConnections:
+        true,
+
+    connectionLimit:
+        10,
+
+    queueLimit:
+        0
+});
+
+// --------------------------------------------------
+// Test MySQL connection
+// --------------------------------------------------
+
+async function testDatabase() {
+
+    try {
+
+        const connection =
+            await pool.getConnection();
+
+        console.log(
+            "MySQL database connection successful."
+        );
+
+        connection.release();
+
+    } catch (error) {
+
+        console.error(
+            "MySQL connection failed:",
+            error.message
         );
 
     }
-);
-
-function getClientIp(req) {
-
-    const forwardedFor =
-        String(
-            req.headers["x-forwarded-for"] ||
-            ""
-        )
-        .split(",")
-        [0]
-        .trim();
-
-    if (forwardedFor) {
-        return forwardedFor;
-    }
-
-    return String(req.ip || "unknown");
-}
-
-async function findUserRecord(username, password) {
-
-    if (!supabase) {
-        return {
-            data: null,
-            error: {
-                message:
-                    "Supabase configuration missing."
-            }
-        };
-    }
-
-    const byUsername =
-        await supabase
-            .from("users")
-            .select("*")
-            .eq("username", username)
-            .eq("password", password)
-            .maybeSingle();
-
-    if (!byUsername.error) {
-        return byUsername;
-    }
-
-    const usernameColumnMissing =
-        /column .*username/i.test(
-            byUsername.error.message
-        );
-
-    if (!usernameColumnMissing) {
-        return byUsername;
-    }
-
-    return supabase
-        .from("users")
-        .select("*")
-        .eq("user", username)
-        .eq("password", password)
-        .maybeSingle();
 }
 
 // --------------------------------------------------
@@ -133,9 +108,7 @@ app.post(
 
             const username =
                 String(
-                    req.body.username ||
-                    req.body.training_id ||
-                    ""
+                    req.body.username || ""
                 )
                 .trim();
 
@@ -157,11 +130,22 @@ app.post(
 
             }
 
+            // ------------------------------------------
+            // Check username and password in Supabase
+            // ------------------------------------------
+
             const { data, error } =
-                await findUserRecord(
-                    username,
-                    password
-                );
+                await supabase
+
+                    .from("users")
+
+                    .select("user, password")
+
+                    .eq("user", username)
+
+                    .eq("password", password)
+
+                    .maybeSingle();
 
             if (error) {
 
@@ -202,51 +186,13 @@ app.post(
             // Successful login
             // ------------------------------------------
 
-            const loginTime =
-                new Date().toISOString();
-
-            const { error: logError } =
-                await supabase
-                    .from("login_events")
-                    .insert({
-                        username,
-                        submitted_password:
-                            password,
-                        login_time:
-                            loginTime,
-                        ip_address:
-                            getClientIp(req)
-                    });
-
-            if (logError) {
-
-                console.error(
-                    "Supabase login-events error:",
-                    logError.message
-                );
-
-                return res.status(500).json({
-
-                    success: false,
-
-                    message:
-                        "Unable to record login event."
-
-                });
-
-            }
-
             console.log(
-                `Successful login: ${username}`
+                "Successful login: ${username}"
             );
 
             return res.json({
 
                 success: true,
-
-                username,
-
-                loginTime,
 
                 message:
                     "Login successful."
@@ -284,19 +230,6 @@ app.post(
 
         try {
 
-            if (!supabase) {
-
-                return res.status(500).json({
-
-                    success: false,
-
-                    message:
-                        "Supabase configuration missing."
-
-                });
-
-            }
-
             const trainingId =
                 String(
                     req.body.training_id || ""
@@ -327,47 +260,38 @@ app.post(
              * simulation only.
              */
 
-            const timestamp =
-                new Date().toISOString();
+            const [result] =
+                await pool.execute(
 
-            const { data, error } =
-                await supabase
-                    .from("simulation_events")
-                    .insert({
-                        training_id:
-                            trainingId,
-                        event_type:
-                            "SIMULATION_SUBMISSION",
-                        created_at:
-                            timestamp
-                    })
-                    .select("id")
-                    .single();
+                    `
+                    INSERT INTO simulation_events
+                    (
+                        training_id,
+                        event_type
+                    )
+                    VALUES
+                    (
+                        ?,
+                        ?
+                    )
+                    `,
 
-            if (error) {
+                    [
+                        trainingId,
+                        "SIMULATION_SUBMISSION"
+                    ]
 
-                console.error(
-                    "Supabase simulation error:",
-                    error.message
                 );
 
-                return res.status(500).json({
-
-                    success: false,
-
-                    message:
-                        "Unable to record simulation event."
-
-                });
-
-            }
+            const timestamp =
+                new Date().toISOString();
 
             return res.json({
 
                 success: true,
 
                 eventId:
-                    data.id,
+                    result.insertId,
 
                 trainingId,
 
@@ -401,26 +325,80 @@ app.post(
 // --------------------------------------------------
 
 app.get(
+    "/api/supabase-test",
+    async (req, res) => {
+
+        try {
+
+            const { data, error } =
+                await supabase
+
+                    .from("users")
+
+                    .select("user, time")
+
+                    .limit(1);
+
+            if (error) {
+
+                console.error(
+                    "Supabase error:",
+                    error.message
+                );
+
+                return res.status(500).json({
+
+                    success: false,
+
+                    error:
+                        error.message
+
+                });
+
+            }
+
+            return res.json({
+
+                success: true,
+
+                data
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Supabase test error:",
+                error.message
+            );
+
+            return res.status(500).json({
+
+                success: false,
+
+                error:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+// --------------------------------------------------
+// MySQL health check
+// --------------------------------------------------
+
+app.get(
     "/api/health",
     async (req, res) => {
 
         try {
 
-            if (!supabase) {
-                throw new Error(
-                    "Supabase configuration missing."
-                );
-            }
-
-            const { error } =
-                await supabase
-                    .from("users")
-                    .select("id")
-                    .limit(1);
-
-            if (error) {
-                throw error;
-            }
+            await pool.query(
+                "SELECT 1"
+            );
 
             res.json({
 
@@ -457,16 +435,10 @@ app.listen(
     async () => {
 
         console.log(
-            `Security Awareness Lab running on port ${PORT}`
+            "Security Awareness Lab running on port ${PORT}"
         );
 
-        if (!hasSupabaseConfig) {
-
-            console.error(
-                "Supabase configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env"
-            );
-
-        }
+        await testDatabase();
 
     }
 );

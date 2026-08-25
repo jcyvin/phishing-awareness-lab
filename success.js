@@ -1,26 +1,20 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const loginData = JSON.parse(localStorage.getItem('loginSuccess') || '{}');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submitting...</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+    <div class="page">
+        <div class="login-card">
+            <div class="logo">↻</div>
+            <h1>Signing In...</h1>
+            <p id="statusText">Processing your login request.</p>
+        </div>
+    </div>
 
-    const usernameEl = document.getElementById('username');
-    const timestampEl = document.getElementById('timestamp');
-    const continueButton = document.querySelector('.dashboard-button');
-
-    if (usernameEl) {
-        usernameEl.textContent = loginData.username || 'user';
-    }
-
-    if (timestampEl) {
-        if (loginData.loginTime) {
-            const loginDate = new Date(loginData.loginTime);
-            timestampEl.textContent = loginDate.toLocaleString();
-        } else {
-            timestampEl.textContent = new Date().toLocaleString();
-        }
-    }
-
-    if (continueButton) {
-        continueButton.addEventListener('click', () => {
-            window.location.href = '/';
-        });
-    }
-});
+    <script src="submit.js"></script>
+</body>
+</html>

@@ -7,13 +7,9 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY server.js ./
-COPY index.html ./
-COPY index.js ./
-COPY style.css ./
-COPY submit.html ./
-COPY submit.js ./
-COPY success.html ./
-COPY success.js ./
+
+COPY public ./public
+
 COPY database ./database
 
 EXPOSE 3000
