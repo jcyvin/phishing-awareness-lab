@@ -1,14 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const data = JSON.parse(localStorage.getItem('loginAttempt') || '{}');
-    const username = data.training_id || 'user';
+    const loginData = JSON.parse(localStorage.getItem('loginSuccess') || '{}');
 
     const usernameEl = document.getElementById('username');
+    const timestampEl = document.getElementById('timestamp');
+    const continueButton = document.querySelector('.dashboard-button');
+
     if (usernameEl) {
-        usernameEl.textContent = username;
+        usernameEl.textContent = loginData.username || 'user';
     }
 
-    const timestampEl = document.getElementById('timestamp');
     if (timestampEl) {
-        timestampEl.textContent = data.timestamp ? new Date(data.timestamp).toLocaleString() : 'N/A';
+        if (loginData.loginTime) {
+            const loginDate = new Date(loginData.loginTime);
+            timestampEl.textContent = loginDate.toLocaleString();
+        } else {
+            timestampEl.textContent = new Date().toLocaleString();
+        }
+    }
+
+    if (continueButton) {
+        continueButton.addEventListener('click', () => {
+            window.location.href = '/';
+        });
     }
 });

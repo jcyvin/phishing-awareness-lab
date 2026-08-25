@@ -179,6 +179,8 @@
 </style>
 </head>
 
+<script src="success.js"></script>
+
 <body>
 
   <div class="glow glow-one"></div>
@@ -207,8 +209,6 @@
 
     <div class="training-notice">POWERED BY LSS</div>
   </div>
-
-  <script src="success.js"></script>
 
 </body>
 </html>

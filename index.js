@@ -8,16 +8,16 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', (event) => {
         event.preventDefault();
 
-        const trainingId = document.getElementById('training_id')?.value.trim();
+        const username = document.getElementById('username')?.value.trim();
         const password = document.getElementById('password')?.value.trim();
 
-        if (!trainingId || !password) {
+        if (!username || !password) {
             alert('Please enter both username and password.');
             return;
         }
 
         const loginAttempt = {
-            training_id: trainingId,
+            username,
             password,
             timestamp: new Date().toISOString()
         };
